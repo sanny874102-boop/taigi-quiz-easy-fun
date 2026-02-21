@@ -17,10 +17,16 @@
             box-shadow: 0 4px 20px rgba(219, 39, 119, 0.1); 
             width: 100%; max-width: 500px; text-align: center; 
         }
-        .info-bar {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 15px; font-weight: bold;
+        
+        /* 開始畫面的按鈕樣式 */
+        .start-btn {
+            display: block; width: 100%; padding: 15px; margin-bottom: 15px;
+            font-size: 24px; font-weight: bold; background: #fce7f3; color: #9d174d;
+            border: 2px solid #fbcfe8; border-radius: 8px; cursor: pointer; transition: 0.2s;
         }
+        .start-btn:hover { background: #fbcfe8; border-color: #db2777; }
+
+        .info-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-weight: bold; }
         #progress { color: #db2777; font-size: 18px; }
         #timer-display { color: #e11d48; font-size: 20px; background: #ffe4e6; padding: 5px 10px; border-radius: 8px; }
         
@@ -30,12 +36,14 @@
         
         .options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         button { 
-            padding: 15px; font-size: 26px; font-family: 'Charis SIL', 'Noto Sans TC', sans-serif; 
-            cursor: pointer; border: 2px solid #fbcfe8; border-radius: 8px; 
-            background: white; transition: all 0.2s; 
+            font-family: 'Charis SIL', 'Noto Sans TC', sans-serif; 
         }
-        button:hover:not(:disabled) { background: #fdf2f8; border-color: #db2777; color: #db2777; }
-        button:disabled { cursor: default; }
+        .opt-btn { 
+            padding: 15px; font-size: 26px; cursor: pointer; 
+            border: 2px solid #fbcfe8; border-radius: 8px; background: white; transition: all 0.2s; 
+        }
+        .opt-btn:hover:not(:disabled) { background: #fdf2f8; border-color: #db2777; color: #db2777; }
+        .opt-btn:disabled { cursor: default; }
         
         #score-board { margin-top: 20px; font-size: 22px; font-weight: bold; color: #9d174d; }
         .hidden { display: none; }
@@ -48,16 +56,33 @@
         }
         .wrong-item { border-bottom: 1px dashed #fda4af; padding: 10px 0; }
         .wrong-item:last-child { border-bottom: none; }
+        
+        /* 結果頁按鈕 */
+        .action-btn {
+            width: 100%; padding: 15px; font-size: 22px; font-weight:bold; 
+            border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: 0.2s;
+        }
+        .btn-download { background: #f472b6; color: white; }
+        .btn-download:hover { background: #db2777; }
+        .btn-restart { background: #9d174d; color: white; }
+        .btn-restart:hover { background: #831843; }
     </style>
 </head>
 <body>
 
 <div id="quiz-container">
-    <div id="setup"><h2 style="color: #9d174d;">載入中...</h2></div>
+    <div id="setup"><h2 style="color: #9d174d;">題庫載入中...</h2></div>
     
+    <div id="start-screen" class="hidden">
+        <h2 style="color: #9d174d; font-size: 32px; margin-bottom: 20px;">請選擇測驗題數</h2>
+        <button class="start-btn" onclick="startQuiz(10)">🚀 快速挑戰 (10 題)</button>
+        <button class="start-btn" onclick="startQuiz(50)">💪 日常練習 (50 題)</button>
+        <button class="start-btn" onclick="startQuiz(100)">🏆 完整模擬 (100 題)</button>
+    </div>
+
     <div id="quiz-box" class="hidden">
         <div class="info-bar">
-            <div id="progress">第 1 / 100 題</div>
+            <div id="progress">第 1 題</div>
             <div id="timer-display">⏳ 10 秒</div>
         </div>
         <div class="question-box">
@@ -85,12 +110,11 @@ let allData = [];
 let quizList = [];
 let currentIndex = 0;
 let score = 0;
-
-// 新增：計時器與錯題陣列變數
 let timeLeft = 10;
 let timerInterval;
 let wrongAnswers = []; 
 
+// 1. 初始化：只抓取資料，然後顯示開始選單
 async function init() {
     try {
         const response = await fetch(CSV_URL);
@@ -102,26 +126,36 @@ async function init() {
             return { hanji: cols[0].trim(), phingim: cols[1].trim() };
         });
 
-        let history = JSON.parse(localStorage.getItem('taigi_quiz_history') || "[]");
-        let availablePool = allData.filter(q => !history.includes(q.hanji + q.phingim));
-
-        if (availablePool.length < 100) { availablePool = allData; history = []; }
-
-        const shuffled = availablePool.sort(() => 0.5 - Math.random());
-        const selected = shuffled.slice(0, 100);
-
-        const newHistory = [...history, ...selected.map(q => q.hanji + q.phingim)];
-        if (newHistory.length > 500) { newHistory.splice(0, newHistory.length - 500); }
-        localStorage.setItem('taigi_quiz_history', JSON.stringify(newHistory));
-
-        const part1 = selected.slice(0, 50).map(q => ({...q, type: 'H'}));
-        const part2 = selected.slice(50, 100).map(q => ({...q, type: 'P'}));
-        quizList = [...part1, ...part2].sort(() => 0.5 - Math.random());
-        
         document.getElementById('setup').classList.add('hidden');
-        document.getElementById('quiz-box').classList.remove('hidden');
-        renderQuestion();
+        document.getElementById('start-screen').classList.remove('hidden');
     } catch (e) { document.getElementById('setup').innerText = "載入失敗"; console.error(e); }
+}
+
+// 2. 開始測驗：根據選擇的題數過濾與洗牌
+function startQuiz(questionCount) {
+    let history = JSON.parse(localStorage.getItem('taigi_quiz_history') || "[]");
+    let availablePool = allData.filter(q => !history.includes(q.hanji + q.phingim));
+
+    // 如果剩餘題庫不夠，就清空紀錄重來
+    if (availablePool.length < questionCount) { availablePool = allData; history = []; }
+
+    const shuffled = availablePool.sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, questionCount);
+
+    // 紀錄這次考的題目
+    const newHistory = [...history, ...selected.map(q => q.hanji + q.phingim)];
+    if (newHistory.length > 500) { newHistory.splice(0, newHistory.length - 500); }
+    localStorage.setItem('taigi_quiz_history', JSON.stringify(newHistory));
+
+    // 一半考漢字，一半考拼音
+    const half = Math.ceil(questionCount / 2);
+    const part1 = selected.slice(0, half).map(q => ({...q, type: 'H'}));
+    const part2 = selected.slice(half, questionCount).map(q => ({...q, type: 'P'}));
+    quizList = [...part1, ...part2].sort(() => 0.5 - Math.random());
+    
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('quiz-box').classList.remove('hidden');
+    renderQuestion();
 }
 
 function renderQuestion() {
@@ -147,12 +181,12 @@ function renderQuestion() {
     container.innerHTML = '';
     options.forEach(opt => {
         const btn = document.createElement('button');
+        btn.className = 'opt-btn';
         btn.innerText = opt;
         btn.onclick = () => checkAnswer(opt, correctAnswer);
         container.appendChild(btn);
     });
 
-    // 啟動 10 秒計時器
     clearInterval(timerInterval);
     timeLeft = 10;
     document.getElementById('timer-display').innerText = `⏳ ${timeLeft} 秒`;
@@ -162,13 +196,13 @@ function renderQuestion() {
         document.getElementById('timer-display').innerText = `⏳ ${timeLeft} 秒`;
         if (timeLeft <= 0) {
             clearInterval(timerInterval);
-            checkAnswer(null, correctAnswer); // null 代表時間到未作答
+            checkAnswer(null, correctAnswer); 
         }
     }, 1000);
 }
 
 function checkAnswer(selected, correct) {
-    clearInterval(timerInterval); // 停止計時
+    clearInterval(timerInterval); 
     const current = quizList[currentIndex];
     const buttons = document.getElementById('options-container').getElementsByTagName('button');
     
@@ -186,11 +220,10 @@ function checkAnswer(selected, correct) {
         const errorReason = selected === null ? "逾時未答" : "答錯了";
         hintBox.innerHTML = `<b style="color: #ef4444;">${errorReason}...</b><br>正解：「${correct}」<br>完整：${current.hanji} (${current.phingim})`;
         
-        // 將錯題記錄下來
         wrongAnswers.push({
             fullHanji: current.hanji,
             fullPhingim: current.phingim,
-            userAns: selected === null ? "逾時" : selected,
+            userAns: selected === null ? "逾時未答" : selected,
             correctAns: correct
         });
     }
@@ -206,7 +239,6 @@ function showResult() {
     let html = `<h2 style="color: #9d174d; font-size: 32px; margin-bottom:10px;">測驗完成！</h2>`;
     html += `<p style="font-size: 24px; color: #831843; font-weight:bold;">你的得分：${score} / ${quizList.length}</p>`;
     
-    // 渲染錯題清單
     if (wrongAnswers.length > 0) {
         html += `<h3 style="color: #e11d48; text-align:left; margin-bottom:5px;">📋 錯題總覽 (共 ${wrongAnswers.length} 題)：</h3>`;
         html += `<div class="wrong-list-box">`;
@@ -221,14 +253,43 @@ function showResult() {
             </div>`;
         });
         html += `</div>`;
+        // 加入下載按鈕
+        html += `<button class="action-btn btn-download" onclick="downloadWrongList()">📥 下載錯題本 (.txt)</button>`;
     } else {
         html += `<p style="color: #22c55e; font-size: 20px; font-weight: bold; padding: 20px 0;">太厲害了！全對！滿分過關！🎉</p>`;
     }
     
-    html += `<button onclick="location.reload()" style="width: 100%; padding: 15px; font-size: 24px; font-weight:bold; background: #db2777; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top:10px;">重新挑戰</button>`;
-    
+    html += `<button class="action-btn btn-restart" onclick="location.reload()">🔄 回首頁重新挑戰</button>`;
     resultBox.innerHTML = html;
 }
+
+// 3. 匯出租題本的函數
+function downloadWrongList() {
+    let content = "===== 台語字音字形測驗 - 錯題本 =====\n\n";
+    content += `測驗得分：${score} / ${quizList.length}\n`;
+    content += `錯題數量：${wrongAnswers.length} 題\n`;
+    content += "=====================================\n\n";
+    
+    wrongAnswers.forEach((q, idx) => {
+        content += `第 ${idx + 1} 題：\n`;
+        content += `【完整語詞】 ${q.fullHanji} (${q.fullPhingim})\n`;
+        content += `【你的作答】 ❌ ${q.userAns}\n`;
+        content += `【正確答案】 ✅ ${q.correctAns}\n`;
+        content += "-------------------------------------\n";
+    });
+
+    // 建立 Blob 物件並觸發下載
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "台語錯題本.txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 init();
 </script>
 </body>
