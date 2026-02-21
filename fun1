@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台語語詞克漏字測驗</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Charis+SIL:ital,wght@0,400;0,700;1,400;1,700&family=Noto+Sans+TC:wght@400;700&display=swap');
+
+        body { 
+            font-family: 'Charis SIL', 'Noto Sans TC', sans-serif; 
+            display: flex; flex-direction: column; align-items: center; 
+            background: #fdf2f8; margin: 0; padding: 20px; 
+        }
+        #quiz-container { 
+            background: white; padding: 30px; border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(219, 39, 119, 0.1); 
+            width: 100%; max-width: 500px; text-align: center; 
+        }
+        .info-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; font-weight: bold;
+        }
+        #progress { color: #db2777; font-size: 18px; }
+        #timer-display { color: #e11d48; font-size: 20px; background: #ffe4e6; padding: 5px 10px; border-radius: 8px; }
+        
+        .question-box { background: #fce7f3; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .question-text { font-size: 40px; font-weight: bold; color: #9d174d; letter-spacing: 2px; }
+        .hint-text { font-size: 24px; color: #831843; margin-top: 15px; line-height: 1.5; min-height: 3em; }
+        
+        .options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        button { 
+            padding: 15px; font-size: 26px; font-family: 'Charis SIL', 'Noto Sans TC', sans-serif; 
+            cursor: pointer; border: 2px solid #fbcfe8; border-radius: 8px; 
+            background: white; transition: all 0.2s; 
+        }
+        button:hover:not(:disabled) { background: #fdf2f8; border-color: #db2777; color: #db2777; }
+        button:disabled { cursor: default; }
+        
+        #score-board { margin-top: 20px; font-size: 22px; font-weight: bold; color: #9d174d; }
+        .hidden { display: none; }
+        
+        /* 錯題清單專用樣式 */
+        .wrong-list-box {
+            text-align: left; background: #fff1f2; padding: 15px; 
+            border-radius: 8px; margin-top: 15px; margin-bottom: 20px; 
+            max-height: 250px; overflow-y: auto; border: 2px solid #fecdd3;
+        }
+        .wrong-item { border-bottom: 1px dashed #fda4af; padding: 10px 0; }
+        .wrong-item:last-child { border-bottom: none; }
+    </style>
+</head>
+<body>
+
+<div id="quiz-container">
+    <div id="setup"><h2 style="color: #9d174d;">載入中...</h2></div>
+    
+    <div id="quiz-box" class="hidden">
+        <div class="info-bar">
+            <div id="progress">第 1 / 100 題</div>
+            <div id="timer-display">⏳ 10 秒</div>
+        </div>
+        <div class="question-box">
+            <div class="question-text" id="question-display"></div>
+            <div class="hint-text" id="hint-display">載入中...</div>
+        </div>
+        <div class="options" id="options-container"></div>
+        <div id="score-board">目前分數: 0</div>
+    </div>
+
+    <div id="result" class="hidden"></div>
+</div>
+
+<div style="margin-top: 20px; color: #db2777; font-size: 16px; text-align: center;">
+    本站總瀏覽人次：<span id="busuanzi_value_site_pv">載入中</span> 次
+</div>
+
+<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+<script>
+// --- ⚠️ 請記得在這裡貼上你的 Google Sheets CSV 連結 ---
+const CSV_URL = '你的_GOOGLE_SHEET_CSV_連結';
+
+let allData = [];
+let quizList = [];
+let currentIndex = 0;
+let score = 0;
+
+// 新增：計時器與錯題陣列變數
+let timeLeft = 10;
+let timerInterval;
+let wrongAnswers = []; 
+
+async function init() {
+    try {
+        const response = await fetch(CSV_URL);
+        const data = await response.text();
+        const rows = data.split('\n').slice(1).filter(r => r.trim() !== '');
+        
+        allData = rows.map(row => {
+            const cols = row.split(',');
+            return { hanji: cols[0].trim(), phingim: cols[1].trim() };
+        });
+
+        let history = JSON.parse(localStorage.getItem('taigi_quiz_history') || "[]");
+        let availablePool = allData.filter(q => !history.includes(q.hanji + q.phingim));
+
+        if (availablePool.length < 100) { availablePool = allData; history = []; }
+
+        const shuffled = availablePool.sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, 100);
+
+        const newHistory = [...history, ...selected.map(q => q.hanji + q.phingim)];
+        if (newHistory.length > 500) { newHistory.splice(0, newHistory.length - 500); }
+        localStorage.setItem('taigi_quiz_history', JSON.stringify(newHistory));
+
+        const part1 = selected.slice(0, 50).map(q => ({...q, type: 'H'}));
+        const part2 = selected.slice(50, 100).map(q => ({...q, type: 'P'}));
+        quizList = [...part1, ...part2].sort(() => 0.5 - Math.random());
+        
+        document.getElementById('setup').classList.add('hidden');
+        document.getElementById('quiz-box').classList.remove('hidden');
+        renderQuestion();
+    } catch (e) { document.getElementById('setup').innerText = "載入失敗"; console.error(e); }
+}
+
+function renderQuestion() {
+    if (currentIndex >= quizList.length) { showResult(); return; }
+    
+    const current = quizList[currentIndex];
+    const isHanji = current.type === 'H';
+    let parts = isHanji ? current.hanji.split('') : current.phingim.split('-');
+    const blankIndex = Math.floor(Math.random() * parts.length);
+    const correctAnswer = parts[blankIndex];
+    let displayParts = [...parts];
+    displayParts[blankIndex] = "（　）";
+    
+    document.getElementById('progress').innerText = `第 ${currentIndex + 1} / ${quizList.length} 題`;
+    document.getElementById('question-display').innerText = isHanji ? displayParts.join('') : displayParts.join('-');
+    document.getElementById('hint-display').innerHTML = isHanji ? `提示：${current.phingim}` : `提示：${current.hanji}`;
+
+    let distractors = allData.flatMap(d => isHanji ? d.hanji.split('') : d.phingim.split('-')).filter(i => i !== correctAnswer && i.length > 0);
+    let options = [correctAnswer, ...[...new Set(distractors)].sort(() => 0.5 - Math.random()).slice(0, 3)];
+    options.sort(() => 0.5 - Math.random());
+
+    const container = document.getElementById('options-container');
+    container.innerHTML = '';
+    options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.innerText = opt;
+        btn.onclick = () => checkAnswer(opt, correctAnswer);
+        container.appendChild(btn);
+    });
+
+    // 啟動 10 秒計時器
+    clearInterval(timerInterval);
+    timeLeft = 10;
+    document.getElementById('timer-display').innerText = `⏳ ${timeLeft} 秒`;
+    
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        document.getElementById('timer-display').innerText = `⏳ ${timeLeft} 秒`;
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            checkAnswer(null, correctAnswer); // null 代表時間到未作答
+        }
+    }, 1000);
+}
+
+function checkAnswer(selected, correct) {
+    clearInterval(timerInterval); // 停止計時
+    const current = quizList[currentIndex];
+    const buttons = document.getElementById('options-container').getElementsByTagName('button');
+    
+    for (let btn of buttons) {
+        btn.disabled = true;
+        if (btn.innerText === correct) { btn.style.background = "#dcfce7"; btn.style.borderColor = "#22c55e"; }
+        if (btn.innerText === selected && selected !== correct) { btn.style.background = "#fee2e2"; btn.style.borderColor = "#ef4444"; }
+    }
+    
+    const hintBox = document.getElementById('hint-display');
+    if (selected === correct) {
+        score++;
+        hintBox.innerHTML = `<b style="color: #22c55e;">正確！</b><br>完整：${current.hanji} (${current.phingim})`;
+    } else {
+        const errorReason = selected === null ? "逾時未答" : "答錯了";
+        hintBox.innerHTML = `<b style="color: #ef4444;">${errorReason}...</b><br>正解：「${correct}」<br>完整：${current.hanji} (${current.phingim})`;
+        
+        // 將錯題記錄下來
+        wrongAnswers.push({
+            fullHanji: current.hanji,
+            fullPhingim: current.phingim,
+            userAns: selected === null ? "逾時" : selected,
+            correctAns: correct
+        });
+    }
+    document.getElementById('score-board').innerText = `目前分數: ${score}`;
+    setTimeout(() => { currentIndex++; renderQuestion(); }, 2000);
+}
+
+function showResult() {
+    document.getElementById('quiz-box').classList.add('hidden');
+    const resultBox = document.getElementById('result');
+    resultBox.classList.remove('hidden');
+    
+    let html = `<h2 style="color: #9d174d; font-size: 32px; margin-bottom:10px;">測驗完成！</h2>`;
+    html += `<p style="font-size: 24px; color: #831843; font-weight:bold;">你的得分：${score} / ${quizList.length}</p>`;
+    
+    // 渲染錯題清單
+    if (wrongAnswers.length > 0) {
+        html += `<h3 style="color: #e11d48; text-align:left; margin-bottom:5px;">📋 錯題總覽 (共 ${wrongAnswers.length} 題)：</h3>`;
+        html += `<div class="wrong-list-box">`;
+        wrongAnswers.forEach((q, idx) => {
+            html += `<div class="wrong-item">
+                <div style="font-size: 22px; font-weight: bold; color: #9d174d;">${idx + 1}. ${q.fullHanji}</div>
+                <div style="font-size: 20px; color: #db2777; margin-bottom: 5px;">${q.fullPhingim}</div>
+                <div style="font-size: 16px; color: #475569;">
+                    ❌ 你的作答: <span style="color:#ef4444">${q.userAns}</span> <br>
+                    ✅ 正確答案: <span style="color:#22c55e">${q.correctAns}</span>
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+    } else {
+        html += `<p style="color: #22c55e; font-size: 20px; font-weight: bold; padding: 20px 0;">太厲害了！全對！滿分過關！🎉</p>`;
+    }
+    
+    html += `<button onclick="location.reload()" style="width: 100%; padding: 15px; font-size: 24px; font-weight:bold; background: #db2777; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top:10px;">重新挑戰</button>`;
+    
+    resultBox.innerHTML = html;
+}
+init();
+</script>
+</body>
+</html>
