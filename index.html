@@ -81,7 +81,7 @@
     <div id="quiz-box" class="hidden">
         <div class="info-bar">
             <div id="progress">第 1 題</div>
-            <div id="timer-display">⏳ 10 秒</div>
+            <div id="timer-display">⏳ 20 秒</div>
         </div>
         <div class="question-box">
             <div class="question-text" id="question-display"></div>
@@ -181,7 +181,7 @@ function renderQuestion() {
     });
 
     clearInterval(timerInterval);
-    timeLeft = 10;
+    timeLeft = 20;
     document.getElementById('timer-display').innerText = `⏳ ${timeLeft} 秒`;
     
     timerInterval = setInterval(() => {
