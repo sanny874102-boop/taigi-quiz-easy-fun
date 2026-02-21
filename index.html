@@ -18,7 +18,6 @@
             width: 100%; max-width: 500px; text-align: center; 
         }
         
-        /* 開始畫面的按鈕樣式 */
         .start-btn {
             display: block; width: 100%; padding: 15px; margin-bottom: 15px;
             font-size: 24px; font-weight: bold; background: #fce7f3; color: #9d174d;
@@ -35,9 +34,7 @@
         .hint-text { font-size: 24px; color: #831843; margin-top: 15px; line-height: 1.5; min-height: 3em; }
         
         .options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        button { 
-            font-family: 'Charis SIL', 'Noto Sans TC', sans-serif; 
-        }
+        button { font-family: 'Charis SIL', 'Noto Sans TC', sans-serif; }
         .opt-btn { 
             padding: 15px; font-size: 26px; cursor: pointer; 
             border: 2px solid #fbcfe8; border-radius: 8px; background: white; transition: all 0.2s; 
@@ -48,7 +45,6 @@
         #score-board { margin-top: 20px; font-size: 22px; font-weight: bold; color: #9d174d; }
         .hidden { display: none; }
         
-        /* 錯題清單專用樣式 */
         .wrong-list-box {
             text-align: left; background: #fff1f2; padding: 15px; 
             border-radius: 8px; margin-top: 15px; margin-bottom: 20px; 
@@ -57,7 +53,6 @@
         .wrong-item { border-bottom: 1px dashed #fda4af; padding: 10px 0; }
         .wrong-item:last-child { border-bottom: none; }
         
-        /* 結果頁按鈕 */
         .action-btn {
             width: 100%; padding: 15px; font-size: 22px; font-weight:bold; 
             border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: 0.2s;
@@ -66,6 +61,9 @@
         .btn-download:hover { background: #db2777; }
         .btn-restart { background: #9d174d; color: white; }
         .btn-restart:hover { background: #831843; }
+        
+        /* 評語專屬樣式 */
+        .feedback-text { font-size: 26px; font-weight: bold; color: #be185d; margin: 15px 0; padding: 10px; background: #fdf2f8; border-radius: 8px; border: 2px dashed #fbcfe8; }
     </style>
 </head>
 <body>
@@ -114,7 +112,6 @@ let timeLeft = 10;
 let timerInterval;
 let wrongAnswers = []; 
 
-// 1. 初始化：只抓取資料，然後顯示開始選單
 async function init() {
     try {
         const response = await fetch(CSV_URL);
@@ -131,23 +128,19 @@ async function init() {
     } catch (e) { document.getElementById('setup').innerText = "載入失敗"; console.error(e); }
 }
 
-// 2. 開始測驗：根據選擇的題數過濾與洗牌
 function startQuiz(questionCount) {
     let history = JSON.parse(localStorage.getItem('taigi_quiz_history') || "[]");
     let availablePool = allData.filter(q => !history.includes(q.hanji + q.phingim));
 
-    // 如果剩餘題庫不夠，就清空紀錄重來
     if (availablePool.length < questionCount) { availablePool = allData; history = []; }
 
     const shuffled = availablePool.sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, questionCount);
 
-    // 紀錄這次考的題目
     const newHistory = [...history, ...selected.map(q => q.hanji + q.phingim)];
     if (newHistory.length > 500) { newHistory.splice(0, newHistory.length - 500); }
     localStorage.setItem('taigi_quiz_history', JSON.stringify(newHistory));
 
-    // 一半考漢字，一半考拼音
     const half = Math.ceil(questionCount / 2);
     const part1 = selected.slice(0, half).map(q => ({...q, type: 'H'}));
     const part2 = selected.slice(half, questionCount).map(q => ({...q, type: 'P'}));
@@ -236,8 +229,26 @@ function showResult() {
     const resultBox = document.getElementById('result');
     resultBox.classList.remove('hidden');
     
+    // --- 新增：計算比例並決定評語 ---
+    let ratio = score / quizList.length;
+    let feedbackMsg = "";
+    
+    if (ratio <= 0.2) {
+        feedbackMsg = "無要緊，咱閣來一遍！";
+    } else if (ratio <= 0.5) {
+        feedbackMsg = "袂䆀喔！閣試幾遍會愈來愈進步喔！";
+    } else if (ratio <= 0.8) {
+        feedbackMsg = "誠𠢕呢！閣試幾遍會愈來愈厲害喔！";
+    } else {
+        feedbackMsg = "原來高手就是你！🏆";
+    }
+    
+    // 生成結果畫面
     let html = `<h2 style="color: #9d174d; font-size: 32px; margin-bottom:10px;">測驗完成！</h2>`;
-    html += `<p style="font-size: 24px; color: #831843; font-weight:bold;">你的得分：${score} / ${quizList.length}</p>`;
+    html += `<p style="font-size: 24px; color: #831843; font-weight:bold; margin-bottom: 5px;">你的得分：${score} / ${quizList.length}</p>`;
+    
+    // 顯示台語評語區塊
+    html += `<div class="feedback-text">${feedbackMsg}</div>`;
     
     if (wrongAnswers.length > 0) {
         html += `<h3 style="color: #e11d48; text-align:left; margin-bottom:5px;">📋 錯題總覽 (共 ${wrongAnswers.length} 題)：</h3>`;
@@ -253,7 +264,6 @@ function showResult() {
             </div>`;
         });
         html += `</div>`;
-        // 加入下載按鈕
         html += `<button class="action-btn btn-download" onclick="downloadWrongList()">📥 下載錯題本 (.txt)</button>`;
     } else {
         html += `<p style="color: #22c55e; font-size: 20px; font-weight: bold; padding: 20px 0;">太厲害了！全對！滿分過關！🎉</p>`;
@@ -263,7 +273,6 @@ function showResult() {
     resultBox.innerHTML = html;
 }
 
-// 3. 匯出租題本的函數
 function downloadWrongList() {
     let content = "===== 台語字音字形測驗 - 錯題本 =====\n\n";
     content += `測驗得分：${score} / ${quizList.length}\n`;
@@ -278,7 +287,6 @@ function downloadWrongList() {
         content += "-------------------------------------\n";
     });
 
-    // 建立 Blob 物件並觸發下載
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
