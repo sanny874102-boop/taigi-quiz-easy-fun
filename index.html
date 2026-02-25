@@ -62,8 +62,10 @@
         .btn-restart { background: #9d174d; color: white; }
         .btn-restart:hover { background: #831843; }
         
-        /* 評語專屬樣式 */
         .feedback-text { font-size: 26px; font-weight: bold; color: #be185d; margin: 15px 0; padding: 10px; background: #fdf2f8; border-radius: 8px; border: 2px dashed #fbcfe8; }
+        
+        /* 流量與版權區域樣式 */
+        .footer-area { margin-top: 30px; text-align: center; color: #db2777; font-size: 14px; line-height: 1.8; }
     </style>
 </head>
 <body>
@@ -81,7 +83,7 @@
     <div id="quiz-box" class="hidden">
         <div class="info-bar">
             <div id="progress">第 1 題</div>
-            <div id="timer-display">⏳ 20 秒</div>
+            <div id="timer-display">⏳ 10 秒</div>
         </div>
         <div class="question-box">
             <div class="question-text" id="question-display"></div>
@@ -94,15 +96,16 @@
     <div id="result" class="hidden"></div>
 </div>
 
-<div style="margin-top: 20px; color: #db2777; font-size: 16px; text-align: center;">
-    本站總瀏覽人次：<span id="busuanzi_value_site_pv">載入中</span> 次
+<div class="footer-area">
+    本站總瀏覽人次：<span id="busuanzi_value_site_pv">載入中</span> 次<br>
+    Copyright &copy; 2026 游雪君. All rights reserved.
 </div>
 
 <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
 
 <script>
 // --- ⚠️ 請記得在這裡貼上你的 Google Sheets CSV 連結 ---
-const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ9YsOXoY1F3UoBVZefhxr0ztsQdvfVRtNr_mMCmXcLpqZ9jpSD9FGr9F1xiJBlOeY7_VK4HvR95Z2B/pub?output=csv';
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/1_j4wT7D-dkKyHqiQ-Ce-kLo1tuHmmB2MgCDDzFGrTa0/export?format=csv';
 
 let allData = [];
 let quizList = [];
@@ -181,7 +184,7 @@ function renderQuestion() {
     });
 
     clearInterval(timerInterval);
-    timeLeft = 20;
+    timeLeft = 10;
     document.getElementById('timer-display').innerText = `⏳ ${timeLeft} 秒`;
     
     timerInterval = setInterval(() => {
@@ -229,7 +232,6 @@ function showResult() {
     const resultBox = document.getElementById('result');
     resultBox.classList.remove('hidden');
     
-    // --- 新增：計算比例並決定評語 ---
     let ratio = score / quizList.length;
     let feedbackMsg = "";
     
@@ -243,11 +245,8 @@ function showResult() {
         feedbackMsg = "原來高手就是你！🏆";
     }
     
-    // 生成結果畫面
     let html = `<h2 style="color: #9d174d; font-size: 32px; margin-bottom:10px;">測驗完成！</h2>`;
     html += `<p style="font-size: 24px; color: #831843; font-weight:bold; margin-bottom: 5px;">你的得分：${score} / ${quizList.length}</p>`;
-    
-    // 顯示台語評語區塊
     html += `<div class="feedback-text">${feedbackMsg}</div>`;
     
     if (wrongAnswers.length > 0) {
