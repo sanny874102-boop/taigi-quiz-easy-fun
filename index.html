@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台語語詞克漏字測驗</title>
+    <title>臺灣台語常用詞字音字形測驗</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Charis+SIL:ital,wght@0,400;0,700;1,400;1,700&family=Noto+Sans+TC:wght@400;700&display=swap');
 
@@ -12,6 +12,17 @@
             display: flex; flex-direction: column; align-items: center; 
             background: #fdf2f8; margin: 0; padding: 20px; 
         }
+
+        /* --- 大標題樣式 --- */
+        .main-title {
+            color: #9d174d;
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 25px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
         #quiz-container { 
             background: white; padding: 30px; border-radius: 12px; 
             box-shadow: 0 4px 20px rgba(219, 39, 119, 0.1); 
@@ -64,11 +75,12 @@
         
         .feedback-text { font-size: 26px; font-weight: bold; color: #be185d; margin: 15px 0; padding: 10px; background: #fdf2f8; border-radius: 8px; border: 2px dashed #fbcfe8; }
         
-        /* 流量與版權區域樣式 */
         .footer-area { margin-top: 30px; text-align: center; color: #db2777; font-size: 14px; line-height: 1.8; }
     </style>
 </head>
 <body>
+
+<h1 class="main-title">臺灣台語常用詞字音字形測驗</h1>
 
 <div id="quiz-container">
     <div id="setup"><h2 style="color: #9d174d;">題庫載入中...</h2></div>
@@ -104,7 +116,7 @@
 <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
 
 <script>
-// --- ⚠️ 請記得在這裡貼上你的 Google Sheets CSV 連結 ---
+// --- ⚠️ 雲端題庫 CSV 連結 ---
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/1_j4wT7D-dkKyHqiQ-Ce-kLo1tuHmmB2MgCDDzFGrTa0/export?format=csv';
 
 let allData = [];
@@ -235,15 +247,10 @@ function showResult() {
     let ratio = score / quizList.length;
     let feedbackMsg = "";
     
-    if (ratio <= 0.2) {
-        feedbackMsg = "無要緊，咱閣來一遍！";
-    } else if (ratio <= 0.5) {
-        feedbackMsg = "袂䆀喔！閣試幾遍會愈來愈進步喔！";
-    } else if (ratio <= 0.8) {
-        feedbackMsg = "誠𠢕呢！閣試幾遍會愈來愈厲害喔！";
-    } else {
-        feedbackMsg = "原來高手就是你！🏆";
-    }
+    if (ratio <= 0.2) { feedbackMsg = "無要緊，咱閣來一遍！"; } 
+    else if (ratio <= 0.5) { feedbackMsg = "袂䆀喔！閣試幾遍會愈來愈進步喔！"; } 
+    else if (ratio <= 0.8) { feedbackMsg = "誠𠢕呢！閣試幾遍會愈來愈厲害喔！"; } 
+    else { feedbackMsg = "原來高手就是你！🏆"; }
     
     let html = `<h2 style="color: #9d174d; font-size: 32px; margin-bottom:10px;">測驗完成！</h2>`;
     html += `<p style="font-size: 24px; color: #831843; font-weight:bold; margin-bottom: 5px;">你的得分：${score} / ${quizList.length}</p>`;
@@ -273,24 +280,24 @@ function showResult() {
 }
 
 function downloadWrongList() {
-    let content = "===== 台語字音字形測驗 - 錯題本 =====\n\n";
+    let content = "===== 臺灣台語常用詞字音字形測驗 - 錯題本 =====\n\n";
     content += `測驗得分：${score} / ${quizList.length}\n`;
     content += `錯題數量：${wrongAnswers.length} 題\n`;
-    content += "=====================================\n\n";
+    content += "===============================================\n\n";
     
     wrongAnswers.forEach((q, idx) => {
         content += `第 ${idx + 1} 題：\n`;
         content += `【完整語詞】 ${q.fullHanji} (${q.fullPhingim})\n`;
         content += `【你的作答】 ❌ ${q.userAns}\n`;
         content += `【正確答案】 ✅ ${q.correctAns}\n`;
-        content += "-------------------------------------\n";
+        content += "-----------------------------------------------\n";
     });
 
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "台語錯題本.txt";
+    a.download = "台語常用詞錯題本.txt";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
